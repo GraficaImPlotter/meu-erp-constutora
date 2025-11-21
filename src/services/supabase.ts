@@ -1,11 +1,10 @@
-/// <reference types="vite/client" />
+import { createClient } from '@supabase/supabase-js';
 
-interface ImportMetaEnv {
-  readonly VITE_SUPABASE_URL: string
-  readonly VITE_SUPABASE_ANON_KEY: string
-  readonly VITE_API_KEY: string
-}
+// ATENÇÃO: Em projetos Vite/Vercel, use import.meta.env em vez de process.env
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
-interface ImportMeta {
-  readonly env: ImportMetaEnv
-}
+// Create client only if keys exist
+export const supabase = (supabaseUrl && supabaseKey) 
+  ? createClient(supabaseUrl, supabaseKey) 
+  : null;

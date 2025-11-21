@@ -5,7 +5,7 @@ import {
 import { 
   MOCK_CLIENTS, MOCK_PROJECTS, MOCK_TRANSACTIONS, MOCK_STOCK, MOCK_PO, MOCK_LOGS 
 } from '../constants';
-import { supabase, isOnlineMode } from '../services/supabase';
+import { supabase } from '../services/supabase';
 
 interface AppContextType {
   currentUser: User | null;
@@ -53,7 +53,8 @@ export const AppProvider = ({ children }: { children?: ReactNode }) => {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>(MOCK_PO);
   const [logs, setLogs] = useState<DailyLog[]>(MOCK_LOGS);
 
-  const online = isOnlineMode();
+  // Check if Supabase is configured and active
+  const online = !!supabase;
 
   // 1. Listen for Auth Changes (Supabase)
   useEffect(() => {
