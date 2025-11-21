@@ -1,16 +1,16 @@
 import { GoogleGenAI } from "@google/genai";
 
-// Using Vite environment variable for API Key
-const apiKey = import.meta.env.VITE_API_KEY || ''; 
+// The API key must be obtained exclusively from the environment variable process.env.API_KEY.
+const apiKey = process.env.API_KEY || ''; 
 
 export const getMaterialSuggestions = async (projectPhase: string, projectType: string): Promise<string> => {
   if (!apiKey) {
-    console.warn("API Key is missing. Simulating response.");
-    return `Simulação (API Key ausente ou inválida): Para a fase de ${projectPhase} em ${projectType}, recomenda-se verificar estoque de cimento, areia e tijolos. Verifique se VITE_API_KEY está configurada na Vercel.`;
+    console.warn("API_KEY is missing. Simulating response.");
+    return `Simulação (API Key ausente ou inválida): Para a fase de ${projectPhase} em ${projectType}, recomenda-se verificar estoque de cimento, areia e tijolos. Verifique se a variável API_KEY está configurada.`;
   }
 
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const model = 'gemini-2.5-flash';
     
     const prompt = `
