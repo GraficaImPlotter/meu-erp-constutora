@@ -220,8 +220,11 @@ export const MOCK_LOGS: DailyLog[] = [
 ];
 
 export const SQL_SCHEMA = `
--- Tabela de Usuários (RBAC)
-CREATE TABLE users (
+-- 1. Habilita extensão necessária para gerar IDs únicos
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- 2. Tabela de Usuários (Login e Permissões)
+CREATE TABLE IF NOT EXISTS users (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
   email VARCHAR(255) UNIQUE NOT NULL,
@@ -230,8 +233,8 @@ CREATE TABLE users (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tabela de Clientes
-CREATE TABLE clients (
+-- 3. Tabela de Clientes
+CREATE TABLE IF NOT EXISTS clients (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name VARCHAR(255) NOT NULL,
   type VARCHAR(2) CHECK (type IN ('PF', 'PJ')),
@@ -244,22 +247,24 @@ CREATE TABLE clients (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tabela de Obras/Projetos
-CREATE TABLE projects (
+-- 4. Tabela de Obras/Projetos
+CREATE TABLE IF NOT EXISTS projects (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   client_id UUID REFERENCES clients(id),
   name VARCHAR(255) NOT NULL,
   address TEXT,
   status VARCHAR(20) CHECK (status IN ('PLANNING', 'IN_PROGRESS', 'COMPLETED', 'PAUSED')),
-  budget DECIMAL(15, 2) NOT NULL DEFAULT 0,
+  budget DECIMAL(15, 2) DEFAULT 0,
+  spent DECIMAL(15, 2) DEFAULT 0,
   start_date DATE,
   completion_date DATE,
+  progress INTEGER DEFAULT 0,
   image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Tabela de Transações Financeiras
-CREATE TABLE transactions (
+-- 5. Tabela de Transações Financeiras
+CREATE TABLE IF NOT EXISTS transactions (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   project_id UUID REFERENCES projects(id),
   description VARCHAR(255) NOT NULL,
@@ -271,13 +276,60 @@ CREATE TABLE transactions (
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Trigger para atualização automática de Saldo da Obra (Exemplo)
+-- 6. Tabela de Estoque (Materiais na Obra)
+CREATE TABLE IF NOT EXISTS stock_items (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID REFERENCES projects(id),
+  name VARCHAR(255) NOT NULL,
+  quantity DECIMAL(10, 2) DEFAULT 0,
+  min_quantity DECIMAL(10, 2) DEFAULT 0,
+  unit VARCHAR(20),
+  last_updated TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 7. Tabela de Requisições de Compra
+CREATE TABLE IF NOT EXISTS purchase_orders (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID REFERENCES projects(id),
+  requester_id UUID REFERENCES users(id),
+  item_name VARCHAR(255) NOT NULL,
+  quantity DECIMAL(10, 2) NOT NULL,
+  unit_price_estimate DECIMAL(15, 2),
+  total_estimate DECIMAL(15, 2),
+  status VARCHAR(20) CHECK (status IN ('PENDING', 'APPROVED', 'REJECTED', 'PURCHASED')),
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 8. Tabela de Diário de Obra
+CREATE TABLE IF NOT EXISTS daily_logs (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  project_id UUID REFERENCES projects(id),
+  author_id UUID REFERENCES users(id),
+  content TEXT,
+  weather VARCHAR(20) CHECK (weather IN ('SUNNY', 'RAINY', 'CLOUDY')),
+  date DATE NOT NULL,
+  images TEXT[], -- Lista de URLs de imagens
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 9. Automação: Atualizar o 'Gasto Realizado' da obra quando uma despesa for PAGA
 CREATE OR REPLACE FUNCTION update_project_spent() RETURNS TRIGGER AS $$
 BEGIN
   IF (TG_OP = 'INSERT' OR TG_OP = 'UPDATE') AND NEW.type = 'EXPENSE' AND NEW.status = 'PAID' THEN
-    UPDATE projects SET spent = (SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE project_id = NEW.project_id AND type = 'EXPENSE' AND status = 'PAID') WHERE id = NEW.project_id;
+    UPDATE projects 
+    SET spent = (
+        SELECT COALESCE(SUM(amount), 0) 
+        FROM transactions 
+        WHERE project_id = NEW.project_id AND type = 'EXPENSE' AND status = 'PAID'
+    ) 
+    WHERE id = NEW.project_id;
   END IF;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS update_spent_trigger ON transactions;
+CREATE TRIGGER update_spent_trigger
+AFTER INSERT OR UPDATE ON transactions
+FOR EACH ROW EXECUTE FUNCTION update_project_spent();
 `;
