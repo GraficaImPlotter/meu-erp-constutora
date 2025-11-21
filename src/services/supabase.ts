@@ -1,10 +1,8 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Using Vite environment variables (import.meta.env)
-// VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY must be set in Vercel
-
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Using process.env instead of import.meta.env to avoid type errors if vite types are missing
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
 
 // Create client only if keys exist
 export const supabase = (supabaseUrl && supabaseKey) 
